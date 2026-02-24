@@ -163,8 +163,8 @@ dependencies {
     // modCompileOnly("com.seibel.distanthorizons:core:core-2.4.1-b-dev-1.20.1")
     // modCompileOnly("com.seibel.distanthorizons:DistantHorizons:common-2.4.1-b-dev-1.20.1")
     // modRuntimeOnlyMsk("com.seibel.distanthorizons:DistantHorizons:fabric-2.4.1-b-dev-1.20.1")
-    modCompileOnly("maven.modrinth:DistantHorizons:2.4.0-b-1.20.1")
-    modRuntimeOnlyMsk("maven.modrinth:DistantHorizons:2.4.0-b-1.20.1")
+    modCompileOnly("maven.modrinth:DistantHorizons:2.4.5-b-1.20.1")
+    modRuntimeOnlyMsk("maven.modrinth:DistantHorizons:2.4.5-b-1.20.1")
     modRuntimeOnlyMsk("maven.modrinth:indium:1.0.36+mc1.20.1")
 }
 

@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
@@ -27,9 +28,7 @@ public class MixinSharedApi {
     )
     private static void beforeChunkUpdateCreation(
             IChunkWrapper chunkWrapper,
-            ArrayList<IChunkWrapper> neighborChunkList,
             IDhLevel dhLevel,
-            boolean canGetNeighboringChunks,
             CallbackInfo ci
     ) {
         ChunkAccess chunkAccess;
