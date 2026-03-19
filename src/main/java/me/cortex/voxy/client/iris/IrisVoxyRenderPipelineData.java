@@ -435,6 +435,12 @@ public class IrisVoxyRenderPipelineData {
         Set<String> samplerNameSet = new LinkedHashSet<>(samplerDataSet.keySet());
         if (samplerNameSet.isEmpty()) return null;
         Set<TextureWSampler> samplerSet = new LinkedHashSet<>();
+
+        //Built up the external samplers list
+        Map<String, IntSupplier> externalTextures = new HashMap<>();
+        externalTextures.put("lightmap", LightMapHelper::getLightmapTextureId);
+
+
         SamplerHolder samplerBuilder = new SamplerHolder() {
             @Override
             public boolean hasSampler(String s) {

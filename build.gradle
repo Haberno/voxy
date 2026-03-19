@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "1.13-SNAPSHOT"
+    id 'fabric-loom' version "1.14-SNAPSHOT"
     id 'maven-publish'
 }
 
@@ -25,6 +25,21 @@ repositories {
             includeGroup "maven.modrinth"
         }
     }
+
+    exclusiveContent {
+        forRepository {
+            maven {
+                name "caffeinemcRepository"
+                url "https://maven.caffeinemc.net/snapshots"
+            }
+        }
+        filter {
+            includeGroup "net.caffeinemc"
+        }
+    }
+
+
+
     maven { url = "https://maven.shedaniel.me/" }
     maven { url = "https://maven.terraformersmc.com/releases/" }
     maven { url = "https://repo.enonic.com/public/"}
@@ -45,12 +60,6 @@ repositories {
         filter {
             includeModuleByRegex("[^\\.]+", "nvidium")
         }
-    }
-    maven {
-        url "https://maven.flashyreese.me/releases"
-    }
-    maven {
-        url "https://maven.flashyreese.me/snapshots"
     }
 }
 
@@ -143,7 +152,6 @@ dependencies {
 
     modCompileOnly("maven.modrinth:sodium-extra:mc1.20.1-0.5.9")
     modRuntimeOnlyMsk("maven.modrinth:sodium-extra:mc1.20.1-0.5.9")
-    modRuntimeOnlyMsk("net.caffeinemc:CaffeineConfig:1.3.0+1.17")
 
     modCompileOnly("maven.modrinth:Chunky:1.3.146-fabric")
     modRuntimeOnlyMsk("maven.modrinth:Chunky:1.3.146-fabric")
@@ -302,7 +310,7 @@ if (!isInGHA) {
     }
 
     dependencies {
-        modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.1.0') {
+        modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.2.2') {
             exclude group: 'net.fabricmc', module: 'fabric-loader'
         }
     }
