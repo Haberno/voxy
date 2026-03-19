@@ -192,7 +192,7 @@ public class TestNodeManager {
             if (geometrySize != 0) {
                 buff = new MemoryBuffer(geometrySize);
             }
-            var builtGeometry = new BuiltSection(pos, (byte) childExistence, -2, buff, null);
+            var builtGeometry = new BuiltSection(pos, (byte) childExistence, -2, buff, null, null);
             this.nodeManager.processGeometryResult(builtGeometry);
         }
 
@@ -410,10 +410,7 @@ public class TestNodeManager {
             return true;
         } catch (Exception e) {
             var trace = new ArrayList<>(List.of(e.getStackTrace()));
-            // Very hacky budget filter: remove stack frames until we reach runTest (if present)
-            while (!trace.isEmpty() && !trace.get(trace.size() - 1).getMethodName().equals("runTest")) {
-                trace.remove(trace.size() - 1);
-            }
+            while (!trace.get(trace.size() - 1).getMethodName().equals("runTest")) trace.remove(trace.size() - 1);//Very hacky budget filter
             synchronized (traces) {
                 if (traces.add(trace)) {
                     e.printStackTrace();

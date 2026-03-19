@@ -2,6 +2,7 @@ package me.cortex.voxy.client.iris;
 
 import com.google.gson.*;
 import com.google.gson.annotations.JsonAdapter;
+import com.llamalad7.mixinextras.lib.gson.Strictness;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -9,7 +10,6 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
-import org.apache.commons.logging.Log;
 import org.lwjgl.opengl.ARBDrawBuffersBlend;
 
 import java.lang.reflect.Modifier;
@@ -23,9 +23,7 @@ import static org.lwjgl.opengl.GL33.*;
 
 public class IrisShaderPatch {
     public static final int VERSION = ((IntSupplier)()->1).getAsInt();
-
-    public static final boolean IMPERSONATE_DISTANT_HORIZONS = System.getProperty("voxy.impersonateDHShader", "false").equalsIgnoreCase("true");
-
+    public static final int SHADER_DEFINE_VERSION = 1;
 
 
     private static final class SSBODeserializer implements JsonDeserializer<Int2ObjectOpenHashMap<String>> {
@@ -177,6 +175,7 @@ public class IrisShaderPatch {
         public boolean excludeLodsFromVanillaDepth;
         public float[] renderScale;
         public boolean useViewportDims;
+        //public boolean deferTranslucentRendering;
         public String checkValid() {
             if (this.blending != null) {
                 int i = 0;
@@ -237,7 +236,7 @@ public class IrisShaderPatch {
         return this.patchData.translucentPatchData;
     }
     public String getTAAShift() {
-        return this.patchData.taaOffset == null?"{return vec2(0.0);}":this.patchData.taaOffset;
+        return this.patchData.taaOffset;// == null?"{return vec2(0.0);}":this.patchData.taaOffset;
     }
     public String[] getUniformList() {
         return this.patchData.uniforms;
@@ -267,6 +266,10 @@ public class IrisShaderPatch {
             return new float[]{this.patchData.renderScale[0],this.patchData.renderScale[0]};
         }
         return new float[]{Math.max(0.01f,this.patchData.renderScale[0]),Math.max(0.01f,this.patchData.renderScale[1])};
+    }
+
+    public boolean deferedTranslucentRendering() {
+        return false;//this.patchData.deferTranslucentRendering;
     }
 
     public Runnable createBlendSetup() {

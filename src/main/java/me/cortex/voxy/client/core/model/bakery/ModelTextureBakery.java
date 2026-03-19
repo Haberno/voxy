@@ -57,7 +57,7 @@ public class ModelTextureBakery {
                 layer == RenderType.tripwire();
 
         int meta = hasDiscard?1:0;
-        meta |= isMipped?2:0;
+        meta |= true?2:0;
         return meta;
     }
 
@@ -169,7 +169,7 @@ public class ModelTextureBakery {
     }
 
 
-    public void renderToStream(BlockState state, int streamBuffer, int streamOffset) {
+    public int renderToStream(BlockState state, int streamBuffer, int streamOffset) {
         this.capture.clear();
         boolean isBlock = true;
         RenderType layer;
@@ -185,9 +185,9 @@ public class ModelTextureBakery {
         }
 
         //TODO: support block model entities
-        BakedBlockEntityModel bbem = null;
+        //BakedBlockEntityModel bbem = null;
         if (state.hasBlockEntity()) {
-            bbem = BakedBlockEntityModel.bake(state);
+            //bbem = BakedBlockEntityModel.bake(state);
         }
 
         //Setup GL state
@@ -218,10 +218,13 @@ public class ModelTextureBakery {
             blockTextureId = Minecraft.getInstance().getTextureManager().getTexture(new ResourceLocation("minecraft", "textures/atlas/blocks.png")).getId();
         }
 
-        //TODO: fastpath for blocks
+        boolean isAnyShaded = false;
+        boolean isAnyDarkend = false;
         if (isBlock) {
             this.vc.reset();
             this.bakeBlockModel(state, layer);
+            isAnyShaded |= this.vc.anyShaded;
+            isAnyDarkend |= this.vc.anyDarkendTex;
             if (!this.vc.isEmpty()) {//only render if there... is shit to render
 
                 //Setup for continual emission
@@ -239,9 +242,9 @@ public class ModelTextureBakery {
 
                     //The projection matrix
                     mat.set(2, 0, 0, 0,
-                            0, 2, 0, 0,
-                            0, 0, -1f, 0,
-                            -1, -1, 0, 1)
+                                    0, 2, 0, 0,
+                                    0, 0, -1f, 0,
+                                    -1, -1, 0, 1)
                             .mul(VIEWS[i]);
 
                     BudgetBufferRenderer.render(mat);
@@ -263,15 +266,17 @@ public class ModelTextureBakery {
                 this.vc.reset();
                 this.bakeFluidState(state, layer, i);
                 if (this.vc.isEmpty()) continue;
+                isAnyShaded |= this.vc.anyShaded;
+                isAnyDarkend |= this.vc.anyDarkendTex;
                 BudgetBufferRenderer.setup(this.vc.getAddress(), this.vc.quadCount(), blockTextureId);
 
                 glViewport((i % 3) * this.width, (i / 3) * this.height, this.width, this.height);
 
                 //The projection matrix
                 mat.set(2, 0, 0, 0,
-                        0, 2, 0, 0,
-                        0, 0, -1f, 0,
-                        -1, -1, 0, 1)
+                                0, 2, 0, 0,
+                                0, 0, -1f, 0,
+                                -1, -1, 0, 1)
                         .mul(VIEWS[i]);
 
                 BudgetBufferRenderer.render(mat);
@@ -280,6 +285,7 @@ public class ModelTextureBakery {
         }
 
         //Render block model entity data if it exists
+        /*
         if (bbem != null) {
             //Rerender everything again ;-; but is ok (is not)
 
@@ -305,7 +311,7 @@ public class ModelTextureBakery {
             glBindVertexArray(0);
 
             bbem.release();
-        }
+        }*/
 
 
 
@@ -325,6 +331,8 @@ public class ModelTextureBakery {
             //reset the blend func
             GL14.glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
+
+        return (isAnyShaded?1:0)|(isAnyDarkend?2:0);
     }
 
 

@@ -144,9 +144,6 @@ public class NodeManager {
         //Verify that pos is actually valid
         assertPosValid(pos);
 
-        if ((pos&0xF) != 0) {
-            throw new IllegalStateException("BAD POS !! YOU DID SOMETHING VERY BAD");
-        }
         if (this.activeSectionMap.containsKey(pos)) {
             Logger.error("Tried inserting top level pos " + WorldEngine.pprintPos(pos) + " but it was in active map, discarding!");
             return;
@@ -896,7 +893,7 @@ public class NodeManager {
 
                     //TODO: make into warning or log error
                     //throw new IllegalStateException("Request result with child existence of 0");
-
+                    Logger.warn("Request result with child existence of 0, for child pos " + WorldEngine.pprintPos(childPos));
                 }
                 this.nodeData.setNodeChildExistence(childNodeId, childExistence);
                 this.nodeData.setNodeGeometry(childNodeId, request.getChildMesh(childIdx));
@@ -966,7 +963,7 @@ public class NodeManager {
             int reqMsk = Byte.toUnsignedInt(request.getMsk());
             if ((byte) (existingChildMsk|reqMsk) != this.nodeData.getNodeChildExistence(parentNodeId)) {
                 //System.out.println(Integer.toBinaryString(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(parentNodeId))));System.out.println(Integer.toBinaryString(existingChildMsk));System.out.println(Integer.toBinaryString(reqMsk));
-                    throw new IllegalStateException("node data existence state does not match pointer mask");
+                throw new IllegalStateException("node data existence state does not match pointer mask");
             }
 
 
@@ -1093,7 +1090,7 @@ public class NodeManager {
 
         //TODO: ADJUST AND FIX THIS TO MAKE IT REMOVE THE LAST THING IN QUEUE OR SOMETHING
         //if (this.activeNodeRequestCount > 100 && WorldEngine.getLevel(pos) < 2) {
-            //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
+        //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
         //    this.invalidateNode(nodeId);
         //    return;
         //}
@@ -1246,7 +1243,7 @@ public class NodeManager {
 
         if (nodeType == NODE_TYPE_INNER) {
             this.clearGeometryInternal(pos, nodeId);
-        //    this.clearId(nodeId);
+            //    this.clearId(nodeId);
         } else {//NODE_TYPE_LEAF
             //TODO: here we need to make the parent node a leaf node...
             // TODO? think about maybe only doing it if all children of the parent are leaf nodes aswell
@@ -1407,7 +1404,7 @@ public class NodeManager {
                 (WorldEngine.getZ(basePos)<<1)|((addin>>1)&1));
     }
 
-    private long makeParentPos(long pos) {
+    private static long makeParentPos(long pos) {
         int lvl = WorldEngine.getLevel(pos);
         if (lvl == MAX_LOD_LAYER) {
             throw new IllegalArgumentException("Cannot create a parent higher than LoD " + (MAX_LOD_LAYER));

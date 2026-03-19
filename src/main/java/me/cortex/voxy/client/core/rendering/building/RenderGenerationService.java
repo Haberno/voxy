@@ -79,7 +79,11 @@ public class RenderGenerationService {
             return new Pair<>(() -> {
                 this.processJob(factory, seenMissed);
             }, factory::free);
-        }, 10, "Section mesh generation service", ()->modelBakery.getProcessingCount()<400||RenderGenerationService.MESH_FAILED_COUNTER.get()<500);
+        }, 10, "Section mesh generation service", ()->{
+            int modelBakeQueueCount = modelBakery.getProcessingCount();
+            if (modelBakeQueueCount>1000) return false;//Pause mesh gen if there is alot of model baking happening
+            return modelBakery.getProcessingCount()<400||RenderGenerationService.MESH_FAILED_COUNTER.get()<500;
+        });
     }
 
     public void setResultConsumer(Consumer<BuiltSection> consumer) {
@@ -214,11 +218,6 @@ public class RenderGenerationService {
 
                 if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
                     task.attempts++;
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException ex) {
-                        throw new RuntimeException(ex);
-                    }
                 } else {
                     if (task.hasDoneModelRequestInner) {
                         task.attempts++;//This is because it can be baking and just model thing isnt keeping up
@@ -288,9 +287,9 @@ public class RenderGenerationService {
         boolean[] isOurs = new boolean[1];
         long stamp = this.taskMapLock.writeLock();
         BuildTask task = this.taskMap.computeIfAbsent(pos, p->{
-                isOurs[0] = true;
-                return new BuildTask(p);
-            });
+            isOurs[0] = true;
+            return new BuildTask(p);
+        });
         this.taskMapLock.unlockWrite(stamp);
 
         if (isOurs[0]) {//If its not ours we dont care about it

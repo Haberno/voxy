@@ -2,14 +2,20 @@ package me.cortex.voxy.client.core.model;
 
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.other.Mapper;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static org.lwjgl.opengl.GL11.GL_STENCIL_TEST;
+import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL11C.GL_EQUAL;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
@@ -26,6 +32,7 @@ public class ModelBakerySubsystem {
 
     private final Thread processingThread;
     private volatile boolean isRunning = true;
+    private volatile Throwable processingThreadException;
     public ModelBakerySubsystem(Mapper mapper) {
         this.mapper = mapper;
         this.factory = new ModelFactory(mapper, this.storage);
@@ -33,16 +40,27 @@ public class ModelBakerySubsystem {
             while (this.isRunning) {
                 this.factory.processAllThings();
                 try {
+                    //TODO: replace with LockSupport.park();
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             }
         }, "Model factory processor");
+        this.processingThread.setUncaughtExceptionHandler((t,e)->{
+            this.isRunning = false;
+            if (e == null) {
+                e = new RuntimeException("unhandled excpetion not added");
+            }
+            this.processingThreadException = e;
+        });
         this.processingThread.start();
     }
 
     public void tick(long totalBudget) {
+        if (this.processingThreadException != null) {
+            throw new RuntimeException(this.processingThreadException);
+        }
         long start = System.nanoTime();
         this.factory.tickAndProcessUploads();
         //Always do 1 iteration minimum
@@ -61,6 +79,12 @@ public class ModelBakerySubsystem {
                 } while (i != null);
 
                 glBindFramebuffer(GL_FRAMEBUFFER, fbBinding);//This is done here as stops needing to set then unset the fb in the thing 1000x
+                //_sobs_ (unbelievable jank hacky and awful fix for frex)
+                if (VoxyClient.isFrexActive()) {//(pure and utter screaming)
+                    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+                    glStencilFunc(GL_EQUAL, 1, 0xFF);
+                    glEnable(GL_STENCIL_TEST);
+                }
             }
             this.blockIdCount.addAndGet(-j);
         }

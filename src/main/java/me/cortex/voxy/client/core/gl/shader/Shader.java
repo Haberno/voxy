@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.gl.shader;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlDebug;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.ThreadUtils;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.system.MemoryStack;
@@ -13,8 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import org.lwjgl.system.Platform;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUseProgram;
@@ -70,6 +69,7 @@ public class Shader extends TrackedObject {
             J make(Builder<J> builder, int program);
         }
         final Map<String, String> defines = new HashMap<>();
+        final Map<String, String> replacements = new LinkedHashMap<>();
         private final Map<ShaderType, String> sources = new HashMap<>();
         private final IShaderProcessor processor;
         private final IShaderObjectConstructor<T> constructor;
@@ -110,8 +110,18 @@ public class Shader extends TrackedObject {
             return this;
         }
 
+        public Builder<T> define(String name, float value) {
+            this.defines.put(name, Float.toString(value)+"f");
+            return this;
+        }
+
         public Builder<T> define(String name, String value) {
             this.defines.put(name, value);
+            return this;
+        }
+
+        public Builder<T> replace(String value, String replacement) {
+            this.defines.put(value, replacement);
             return this;
         }
 
@@ -140,6 +150,10 @@ public class Shader extends TrackedObject {
                             defs
                             + src.substring(src.indexOf('\n')+1);
 
+                    for (var replacement : this.replacements.entrySet()) {
+                        src = src.replace(replacement.getKey(), replacement.getValue());
+                    }
+
                     shaders[i++] = createShader(entry.getKey(), src);
                 }
             }
@@ -159,7 +173,7 @@ public class Shader extends TrackedObject {
 
         public T compile() {
             this.defineIf("IS_INTEL", Capabilities.INSTANCE.isIntel);
-            this.defineIf("IS_WINDOWS", Platform.get() == Platform.WINDOWS);
+            this.defineIf("IS_WINDOWS", ThreadUtils.isWindows);
             return this.constructor.make(this, this.compileToProgram());
         }
 

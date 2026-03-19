@@ -5,15 +5,17 @@ import me.cortex.voxy.common.util.MemoryBuffer;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import org.lwjgl.system.MemoryUtil;
 
-import static me.cortex.voxy.client.core.model.bakery.BudgetBufferRenderer.VERTEX_FORMAT_SIZE;
-
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
 public final class ReuseVertexConsumer implements VertexConsumer {
+    public static final int VERTEX_FORMAT_SIZE = 24;
     private MemoryBuffer buffer = new MemoryBuffer(8192);
     private long ptr;
     private int count;
     private int defaultMeta;
+
+    public boolean anyShaded;
+    public boolean anyDarkendTex;
 
     public ReuseVertexConsumer() {
         this.reset();
@@ -46,6 +48,11 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
+    public VertexConsumer color(int i) {
+        return this;
+    }
+
+    @Override
     public ReuseVertexConsumer uv(float u, float v) {
         MemoryUtil.memPutFloat(this.ptr + 16, u);
         MemoryUtil.memPutFloat(this.ptr + 20, v);
@@ -68,16 +75,19 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
+        this.anyShaded |= quad.isShade();
+        this.anyDarkendTex |= false;
         this.ensureCanPut();
         int[] data = quad.getVertices();
         for (int i = 0; i < 4; i++) {
-            float x = Float.intBitsToFloat(data[i * 8]);
-            float y = Float.intBitsToFloat(data[i * 8 + 1]);
-            float z = Float.intBitsToFloat(data[i * 8 + 2]);
-            this.vertex(x,y,z);
-            float u = Float.intBitsToFloat(data[i * 8 + 4]);
-            float v = Float.intBitsToFloat(data[i * 8 + 5]);
-            this.uv(u,v);
+            int offset = i * 8;
+            float x = Float.intBitsToFloat(data[offset]);
+            float y = Float.intBitsToFloat(data[offset + 1]);
+            float z = Float.intBitsToFloat(data[offset + 2]);
+            this.vertex(x, y, z);
+            float u = Float.intBitsToFloat(data[offset + 4]);
+            float v = Float.intBitsToFloat(data[offset + 5]);
+            this.uv(u, v);
 
             this.meta(metadata);
         }
@@ -98,6 +108,8 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public ReuseVertexConsumer reset() {
+        this.anyShaded = false;
+        this.anyDarkendTex = false;
         this.defaultMeta = 0;//RESET THE DEFAULT META
         this.count = 0;
         this.ptr = this.buffer.address - VERTEX_FORMAT_SIZE;//the thing is first time this gets incremented by FORMAT_STRIDE

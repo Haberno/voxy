@@ -3,6 +3,7 @@ package me.cortex.voxy.common.world;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandles;
@@ -155,7 +156,9 @@ public class ActiveSectionTracker {
                 //TODO: REWRITE THE section tracker _again_ to not be so shit and jank, and so that Arrays.fill is not 10% of the execution time
                 if (status == 1) {
                     //We need to set the data to air as it is undefined state
-                    Arrays.fill(section.data, 0);
+                    int sky = 15;
+                    int block = 0;
+                    Arrays.fill(section.data, Mapper.composeMappingId((byte) (sky|(block<<4)),0,0));
                 }
                 section.acquire(1);
             }
@@ -201,14 +204,14 @@ public class ActiveSectionTracker {
         }
     }
 
-    void tryUnload(WorldSection section) {
+    void tryUnload(WorldSection section, int hints) {
         if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         if (section.isDirty&&this.engine!=null) {
             if (section.tryAcquire()) {
                 if (section.setNotDirty()) {//If the section is dirty we must enqueue for saving
-                    this.engine.saveSection(section);
+                    this.engine.saveSection(section);//can block
                 }
-                section.release(false);//Special
+                section.release(false, hints);//Special
             }
         }
 
@@ -226,9 +229,9 @@ public class ActiveSectionTracker {
                 if (section.tryAcquire()) {
                     if (section.setNotDirty()) {//If the section is dirty we must enqueue for saving
                         if (this.engine != null)
-                            this.engine.saveSection(section);
+                            this.engine.saveSection(section, true);//not allowed to block as we are in a lock
                     }
-                    section.release(false);//Special
+                    section.release(false, hints);//Special
                 } else {
                     throw new IllegalStateException("Section was dirty but is also unloaded, this is very bad");
                 }

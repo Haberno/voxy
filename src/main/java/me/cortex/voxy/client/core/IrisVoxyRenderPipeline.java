@@ -26,13 +26,12 @@ import static org.lwjgl.opengl.GL45C.*;
 public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     private final IrisVoxyRenderPipelineData data;
     private final FullscreenBlit depthBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag");
-    public final DepthFramebuffer fb = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
-    public final DepthFramebuffer fbTranslucent = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
+    public final DepthFramebuffer fbTranslucent = new DepthFramebuffer(this.fb.getFormat());
 
     private final GlBuffer shaderUniforms;
 
     public IrisVoxyRenderPipeline(IrisVoxyRenderPipelineData data, AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
-        super(nodeManager, nodeCleaner, traversal, frexSupplier);
+        super(nodeManager, nodeCleaner, traversal, frexSupplier, data.shouldDeferTranslucency());
         this.data = data;
         if (this.data.thePipeline != null) {
             throw new IllegalStateException("Pipeline data already bound");
@@ -79,7 +78,6 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         this.data.thePipeline = null;
 
         this.depthBlit.delete();
-        this.fb.free();
         this.fbTranslucent.free();
 
         if (this.shaderUniforms != null) {
@@ -147,6 +145,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         } else {
             // normally disabled by AbstractRenderPipeline but since we are skipping it we do it here
             glDisable(GL_STENCIL_TEST);
+            glDisable(GL_DEPTH_TEST);
         }
     }
 
@@ -193,7 +192,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         super.addDebug(debug);
     }
 
-    private static final int UNIFORM_BINDING_POINT = 5;//TODO make ths binding point... not randomly 5
+    private static final int UNIFORM_BINDING_POINT = 7;//TODO make ths binding point... not randomly 5
 
     private StringBuilder buildGenericShaderHeader(AbstractSectionRenderer<?, ?> renderer, String input) {
         StringBuilder builder = new StringBuilder(input).append("\n\n\n");
@@ -238,12 +237,21 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
+    public boolean hasTAA() {
+        return this.data.TAA != null;
+    }
+
+    @Override
     public String taaFunction(String functionName) {
         return this.taaFunction(UNIFORM_BINDING_POINT, functionName);
     }
 
     @Override
     public String taaFunction(int uboBindingPoint, String functionName) {
+        if (this.data.TAA == null) {
+            return null;
+        }
+
         var builder = new StringBuilder();
 
         if (this.data.getUniforms() != null) {
