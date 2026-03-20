@@ -67,7 +67,7 @@ public abstract class VoxyConfigScreenPages {
                                 instance.updateDedicatedThreads();
                             }
                         }, s -> s.serviceThreads)
-                        // .setImpact(OptionImpact.HIGH) // В старом Sodium Impact настраивается, если нужно
+                        .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
                         .setName(Component.translatable("voxy.config.general.useSodiumBuilder"))
