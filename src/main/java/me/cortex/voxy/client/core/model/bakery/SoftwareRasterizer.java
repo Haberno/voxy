@@ -1,8 +1,7 @@
-package me.cortex.voxy.client.config;
+package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.client.core.model.ARGB;
 import me.cortex.voxy.client.core.model.ModelFactory;
-import me.cortex.voxy.client.core.model.bakery.ReuseVertexConsumer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;

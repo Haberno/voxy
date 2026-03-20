@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.model.bakery;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import me.cortex.voxy.client.config.SoftwareRasterizer;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import net.minecraft.client.Minecraft;
