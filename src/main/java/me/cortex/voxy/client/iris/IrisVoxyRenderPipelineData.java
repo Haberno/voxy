@@ -482,7 +482,13 @@ public class IrisVoxyRenderPipelineData {
             @Override
             public void addExternalSampler(int texture, String... names) {
                 if (!this.hasSampler(names)) return;
-                samplerSet.add(new TextureWSampler(this.name(names), ()->texture, -1));
+                var name = this.name(names);
+                var ex = externalTextures.get(name);
+                if (ex != null) {
+                    samplerSet.add(new TextureWSampler(name, ex, 0));//unbind any sampler and use the externalTextureSupplier
+                } else {
+                    samplerSet.add(new TextureWSampler(name, () -> texture, -1));
+                }
             }
         };
 
