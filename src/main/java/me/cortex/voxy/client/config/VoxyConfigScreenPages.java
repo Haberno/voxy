@@ -73,6 +73,8 @@ public abstract class VoxyConfigScreenPages {
                         .setName(Component.translatable("voxy.config.general.useSodiumBuilder"))
                         .setTooltip(Component.translatable("voxy.config.general.useSodiumBuilder.tooltip"))
                         .setControl(TickBoxControl::new)
+                        .setImpact(OptionImpact.VARIES)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .setBinding((s, v) -> {
                             s.dontUseSodiumBuilderThreads = !v;
                             var instance = VoxyCommon.getInstance();
@@ -108,6 +110,7 @@ public abstract class VoxyConfigScreenPages {
                             }
                             try { IrisUtil.reload(); } catch (Throwable ignored) {}
                         }, s -> s.enableRendering)
+                        .setImpact(OptionImpact.HIGH)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
@@ -133,9 +136,13 @@ public abstract class VoxyConfigScreenPages {
                                 }
                             }
                         }, s -> Math.round(s.sectionRenderDistance * 16))
+                        .setImpact(OptionImpact.LOW)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
-                )
+                ).build()
+        );
+
+        groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, storage)
                         .setName(Component.translatable("voxy.config.general.render_fog"))
                         .setTooltip(Component.translatable("voxy.config.general.render_fog.tooltip"))
