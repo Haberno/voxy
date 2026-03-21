@@ -118,6 +118,7 @@ public abstract class VoxyConfigScreenPages {
                         .setTooltip(Component.translatable("voxy.config.general.subDivisionSize.tooltip"))
                         .setControl(opt -> new SliderControl(opt, 0, SUBDIV_IN_MAX, 1, v -> Component.literal(Integer.toString(Math.round(ln2subDiv(v))))))
                         .setBinding((s, v) -> s.subDivisionSize = ln2subDiv(v), s -> subDiv2ln(s.subDivisionSize))
+                        .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Component.translatable("voxy.config.general.renderDistance"))
