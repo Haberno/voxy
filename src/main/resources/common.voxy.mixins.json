@@ -9,5 +9,8 @@
     "chunky.MixinFabricWorld",
     "distanthorizons.MixinSharedApi",
     "minecraft.MixinWorld"
-  ]
+  ],
+  "overwrites": {
+    "requireAnnotations": true
+  }
 }

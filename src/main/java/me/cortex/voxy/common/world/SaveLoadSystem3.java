@@ -49,11 +49,16 @@ public class SaveLoadSystem3 {
         long metadataPtr = ptr; ptr += 8;
 
         long blockPtr = ptr; ptr += WorldSection.SECTION_VOLUME*2;
+        long prev = data[0]; MemoryUtil.memPutLong(ptr, prev); ptr+=8; LUT.put(prev, (short) 0);
+        short mapping = 0;
         for (long block : data) {
-            short mapping = LUT.putIfAbsent(block, (short) LUT.size());
-            if (mapping == -1) {
-                mapping = (short) (LUT.size()-1);
-                MemoryUtil.memPutLong(ptr, block); ptr+=8;
+            if (prev != block) {
+                prev = block;
+                mapping = LUT.putIfAbsent(block, (short) LUT.size());
+                if (mapping == -1) {
+                    mapping = (short) (LUT.size()-1);
+                    MemoryUtil.memPutLong(ptr, block); ptr+=8;
+                }
             }
             MemoryUtil.memPutShort(blockPtr, mapping); blockPtr+=2;
         }
@@ -70,8 +75,7 @@ public class SaveLoadSystem3 {
         MemoryUtil.memPutLong(metadataPtr, metadata);
         //TODO: do hash
 
-        //TODO: rework the storage system to not need to do useless copies like this (this is an issue for serialization, deserialization has solved this already)
-        return buffer.subSize(ptr-buffer.address).copy();
+        return buffer.subSize(ptr-buffer.address);//Does not get freed
     }
 
     public static boolean deserialize(WorldSection section, MemoryBuffer data) {

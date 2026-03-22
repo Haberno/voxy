@@ -1,10 +1,11 @@
+/*
 package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.common.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.RenderType;
-// import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.EntityBlock;
@@ -71,7 +72,6 @@ public class BakedBlockEntityModel {
         entity.setLevel(Minecraft.getInstance().level);
         if (renderer != null) {
             try {
-                /*
                 var rt = renderer.createRenderState();
                 renderer.extractRenderState(entity, rt, 0.0f, new Vec3d(0,0,0), null);
 
@@ -81,7 +81,6 @@ public class BakedBlockEntityModel {
                 renderer.submit(rt, new MatrixStack(), queue, cstate);
                 var qq = queue.order(0);
                 qq.
-                */
                 //renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer().setDefaultMeta(getMetaFromLayer(rl)))).consumer, 0, 0, new Vec3d(0,0,0));
             } catch (Exception e) {
                 Logger.error("Unable to bake block entity: " + entity, e);
@@ -103,3 +102,4 @@ public class BakedBlockEntityModel {
         return new BakedBlockEntityModel(new ArrayList<>(map.values()));
     }
 }
+*/

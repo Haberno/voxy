@@ -18,6 +18,8 @@ import java.util.Arrays;
 
 
 public class RenderDataFactory {
+    private static final boolean BUILD_OCCUPANCY_SET = false;
+
     private static final boolean CHECK_NEIGHBOR_FACE_OCCLUSION = true;
     private static final boolean DISABLE_CULL_SAME_OCCLUDES = false;//TODO: FIX TRANSLUCENTS (e.g. stained glass) breaking on chunk boarders with this set to false (it might be something else????)
 
@@ -60,6 +62,8 @@ public class RenderDataFactory {
     private int maxZ;
 
     private int quadCount = 0;
+
+    private final OccupancySet occupancy = new OccupancySet();
 
     //Wont work for double sided quads
     private final class Mesher extends ScanMesher2D {
@@ -106,7 +110,7 @@ public class RenderDataFactory {
 
             //Lower 26 bits can be auxiliary data since that is where quad position information goes;
             int auxData = (int) (data&((1<<26)-1));
-            data &= ~((1<<26)-1);
+            data &= ~((1L<<26)-1);
 
             int axisSide = auxData&1;
             int type = (auxData>>1)&3;//Translucent, double side, directional
@@ -192,8 +196,9 @@ public class RenderDataFactory {
             boolean a = ModelQueries.isTranslucent(metadata);
             boolean b = ModelQueries.isDoubleSided(metadata);
             //Pre shift by 1
-            type = a|b?0:4;
-            type |= b?2:0;
+            //type = a|b?0:4;
+            //type |= b&!a?2:0;
+            type = a?0:(b?2:4);
         }
         return type;
     }
@@ -218,33 +223,39 @@ public class RenderDataFactory {
         long pureFluid = 0;
         long partialFluid = 0;
 
-        int neighborAcquireMsk = 0;//-+x, -+z, -+y
-        for (int i = 0; i < 32*32*32;) {
-            long block = rawSectionData[i];//Get the block mapping
-            if (Mapper.isAir(block)) {//If it is air, just emit lighting
-                sectionData[i * 2] = (block&(0xFFL<<56))>>>1;
-                sectionData[i * 2 + 1] = 0;
-            } else {
-                int modelId = rawModelIds[Mapper.getBlockId(block)];
-                if (modelId == -1) {//Failed, so just return error
-                    return Mapper.getBlockId(block)|(1<<31);
+        int neighborAcquireMskAndFlags = 0;//-+x, -+z, -+y
+        int i = 0;
+        for (int q = 0; q < 512; q++) {
+            for (int j = 0; j < 64; i++, j++) {
+                long block = rawSectionData[i];//Get the block mapping
+                if (Mapper.isAir(block)) {//If it is air, just emit lighting
+                    sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
+                    sectionData[i * 2 + 1] = 0;
+                } else {
+                    int modelId = rawModelIds[Mapper.getBlockId(block)];
+                    if (modelId == -1) {//Failed, so just return error
+                        return Mapper.getBlockId(block) | (1 << 31);
+                    }
+                    if (modelId == 0) {//modelId == 0, its basicly air so set it as air
+                        sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
+                        sectionData[i * 2 + 1] = 0;
+                    } else {
+                        //TODO: cache the results of this, then link it to `block` do same optimization as SaveLoadSystem3
+
+                        long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
+
+                        sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
+                        sectionData[i * 2 + 1] = modelMetadata;
+
+                        long msk = 1L << j;
+                        opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
+                        notEmpty |= modelId != 0 ? msk : 0;
+                        pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
+                        partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
+                    }
                 }
-                long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
-
-                sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
-                sectionData[i * 2 + 1] = modelMetadata;
-
-                long msk = 1L << (i & 63);
-                opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
-                notEmpty |= modelId != 0 ? msk : 0;
-                pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
-                partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
             }
-
-            //Do increment here
-            i++;
-
-            if ((i & 63) == 0 && notEmpty != 0) {
+            if (notEmpty != 0) {
                 long nonOpaque = (notEmpty^opaque)&~pureFluid;
                 long fluid = pureFluid|partialFluid;
                 this.opaqueMasks[(i >> 5) - 2] = (int) opaque;
@@ -267,8 +278,8 @@ public class RenderDataFactory {
                 neighborMsk += (((((i - 33) >> 5) & 0x1F) == 0) ? 0b10000 : 0)*(((int)notEmpty)!=0?1:0);//-z
                 neighborMsk += (((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0)*((notEmpty>>>32)!=0?1:0);//+z
 
-                neighborAcquireMsk |= neighborMsk;
-
+                neighborAcquireMskAndFlags |= neighborMsk;
+                neighborAcquireMskAndFlags |= opaque!=0?(1<<6):0;
 
                 opaque = 0;
                 notEmpty = 0;
@@ -276,7 +287,7 @@ public class RenderDataFactory {
                 partialFluid = 0;
             }
         }
-        return neighborAcquireMsk;
+        return neighborAcquireMskAndFlags;
     }
 
     private void acquireNeighborData(WorldSection section, int msk) {
@@ -288,7 +299,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i] = raw[(i<<5)+31];//pull the +x faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
         if ((msk&2)!=0) {//+x
             var sec = this.world.acquire(section.lvl, section.x + 1, section.y, section.z);
@@ -297,7 +308,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32] = raw[(i<<5)];//pull the -x faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
 
         if ((msk&4)!=0) {//-y
@@ -307,7 +318,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*2] = raw[i|(0x1F<<10)];//pull the +y faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
         if ((msk&8)!=0) {//+y
             var sec = this.world.acquire(section.lvl, section.x, section.y + 1, section.z);
@@ -316,7 +327,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*3] = raw[i];//pull the -y faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
 
         if ((msk&16)!=0) {//-z
@@ -326,7 +337,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*4] = raw[ExpansionUgly.expand(i,0b11111_00000_11111)|(0x1F<<5)];//pull the +z faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
         if ((msk&32)!=0) {//+z
             var sec = this.world.acquire(section.lvl, section.x, section.y, section.z + 1);
@@ -335,7 +346,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*5] = raw[ExpansionUgly.expand(i,0b11111_00000_11111)];//pull the -z faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
     }
 
@@ -344,7 +355,7 @@ public class RenderDataFactory {
     private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
         if (((quad^neighborQuad)&(0xFFFFL<<26))==0 && (DISABLE_CULL_SAME_OCCLUDES || (ModelQueries.cullsSame(meta)||ModelQueries.faceOccludes(meta, face)))) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face// TODO: FIXME
         if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
-        //if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
+        if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
             if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
         return true;
     }
@@ -462,7 +473,8 @@ public class RenderDataFactory {
 
                         int nib = Mapper.getBlockId(neighborId);
                         if (nib != 0) {//Not air
-                            long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                            int cid = this.modelMan.getModelId(nib);
+                            long meta = this.modelMan.getModelMetadataFromClientId(cid);
                             if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
                                 this.blockMesher.skip(1);
                                 continue;
@@ -472,7 +484,7 @@ public class RenderDataFactory {
                             //TODO:FIXME, when non opaque geometry is added
                             if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
                                 boolean culls = false;
-                                culls |= nib==((A>>26)&0xFFFF)&&ModelQueries.cullsSame(meta);
+                                culls |= cid==((A>>26)&0xFFFF)&&ModelQueries.cullsSame(meta);
                                 culls |= ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side));
                                 if (culls) {
                                     this.blockMesher.skip(1);
@@ -763,7 +775,9 @@ public class RenderDataFactory {
                         //Check and test if can cull W.R.T neighbor
                         if (Mapper.getBlockId(neighborId) != 0) {//Not air
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                            if (modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
+
+
+                            if (ModelQueries.cullsSame(B) && modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                                 //TODO: check self occlsuion in the if statment
                                 fail = true;
                             } else {
@@ -778,7 +792,9 @@ public class RenderDataFactory {
                         long nA = this.sectionData[(idx+skipAmount) * 2];
                         long nB = this.sectionData[(idx+skipAmount) * 2 + 1];
                         boolean failB = false;
-                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
+                        //TODO: check self occlusion
+
+                        if (ModelQueries.cullsSame(nB) && (nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                             //TODO: check self occlsuion in the if statment
                             failB = true;
                         } else {
@@ -1488,6 +1504,7 @@ public class RenderDataFactory {
                 int msk = this.nonOpaqueMasks[i];
                 if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
+                    //TODO also check self occlusion
 
                     int sidx = (i<<5) * 2;
                     long A = this.sectionData[sidx];
@@ -1508,6 +1525,8 @@ public class RenderDataFactory {
 
                 if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
+                    //TODO also check self occlusion
+
 
                     int sidx = (i*32+31) * 2;
                     long A = this.sectionData[sidx];
@@ -1560,6 +1579,29 @@ public class RenderDataFactory {
         }
     }
 
+    //Build the occupancy set (used for AO) from the set of fully opaque blocks (atm, this can change in the future if needed to a special occupancy bitset)
+    private final void buildOccupancy() {
+        //We basicly want to record all the points where we go from air to solid or solid to air (this is to just get better compression)
+        for (int i = 0; i < 32*32; i++) {
+            int occ = 0;
+            int msk = this.opaqueMasks[i];
+            //x
+            occ |= msk^(msk>>1);
+            occ |= msk^(msk<<1);
+            //y
+            occ |= i<32*31?msk^this.opaqueMasks[i+32]:0;
+            occ |= 31<i   ?msk^this.opaqueMasks[i-32]:0;
+            //z
+            occ |= (i&31)<31?msk^this.opaqueMasks[i+1]:0;
+            occ |= 0< (i&31)?msk^this.opaqueMasks[i-1]:0;
+
+            //We now have our occlusion mask, fill in our occupancy set
+            for (;occ!=0;occ&=~Integer.lowestOneBit(occ)) {
+                this.occupancy.set(i*32+Integer.numberOfTrailingZeros(occ));
+            }
+        }
+    }
+
     //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
         //TODO: FIXME: because of the exceptions that are thrown when aquiring modelId
@@ -1590,6 +1632,8 @@ public class RenderDataFactory {
             }
         }
 
+        this.occupancy.reset();
+
         this.minX = Integer.MAX_VALUE;
         this.minY = Integer.MAX_VALUE;
         this.minZ = Integer.MAX_VALUE;
@@ -1603,10 +1647,12 @@ public class RenderDataFactory {
         Arrays.fill(this.fluidMasks, 0);
 
         //Prepare everything
-        int neighborMsk = this.prepareSectionData(section._unsafeGetRawDataArray());
-        if (neighborMsk>>31!=0) {//We failed to get everything so throw exception
-            throw new IdNotYetComputedException(neighborMsk&(~(1<<31)), true);
+        int neighborMskAndFlags = this.prepareSectionData(section._unsafeGetRawDataArray());
+        if ((neighborMskAndFlags&(1<<31))!=0) {//We failed to get everything so throw exception
+            throw new IdNotYetComputedException(neighborMskAndFlags&((1<<20)-1), true);
         }
+        int neighborMsk = neighborMskAndFlags&0b11_11_11;
+        int flags = neighborMskAndFlags>>>6;
         if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
             this.acquireNeighborData(section, neighborMsk);
         }
@@ -1618,6 +1664,11 @@ public class RenderDataFactory {
             e.auxBitMsk = neighborMsk;
             e.auxData = this.neighboringFaces;
             throw e;
+        }
+
+        //We only care if we have quads
+        if (BUILD_OCCUPANCY_SET && this.quadCount != 0 && (flags&1) != 0) {
+            this.buildOccupancy();
         }
 
         //TODO:NOTE! when doing face culling of translucent blocks,
@@ -1654,7 +1705,13 @@ public class RenderDataFactory {
         aabb |= (this.maxY-this.minY-1)<<20;
         aabb |= (this.maxZ-this.minZ-1)<<25;
 
-        return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets);
+        MemoryBuffer occupancy = null;
+        if (BUILD_OCCUPANCY_SET && !this.occupancy.isEmpty()) {
+            occupancy = new MemoryBuffer(this.occupancy.writeSize());
+            this.occupancy.write(occupancy.address, false);
+        }
+
+        return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets, occupancy);
     }
 
     public void free() {

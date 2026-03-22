@@ -1,15 +1,14 @@
 package me.cortex.voxy.client.config;
 
 import com.google.common.collect.ImmutableList;
-import me.cortex.voxy.client.RenderStatistics;
-import me.cortex.voxy.client.VoxyClientInstance;
+import me.cortex.voxy.client.ClientSessionEvents;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
+import me.cortex.voxy.client.core.util.IrisUtil;
+import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.jellysquid.mods.sodium.client.gui.options.*;
 import me.jellysquid.mods.sodium.client.gui.options.control.SliderControl;
 import me.jellysquid.mods.sodium.client.gui.options.control.TickBoxControl;
-import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
@@ -33,21 +32,19 @@ public abstract class VoxyConfigScreenPages {
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)->{
                             s.enabled = v;
-                            if (v) {
-                                if (VoxyClientInstance.isInGame) {
-                                    VoxyCommon.createInstance();
-                                    var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
-                                    if (vrsh != null && s.enableRendering) {
-                                        vrsh.createRenderer();
-                                    }
-                                }
-                            } else {
+                            if (v && ClientSessionEvents.inSession) {
+                                VoxyCommon.createInstance();
+                            }
+
+                            if (!v) {
                                 var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
                                 if (vrsh != null) {
                                     vrsh.shutdownRenderer();
                                 }
                                 VoxyCommon.shutdownInstance();
                             }
+
+                            try { IrisUtil.reload(); } catch (Throwable ignored) {}
                         }, s -> s.enabled)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
@@ -58,11 +55,12 @@ public abstract class VoxyConfigScreenPages {
                 .add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Component.translatable("voxy.config.general.serviceThreads"))
                         .setTooltip(Component.translatable("voxy.config.general.serviceThreads.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 1,
-                                // CpuLayout.CORES.length, //Just do core size as max
-                                Runtime.getRuntime().availableProcessors() * 2,//Note: this is threads not cores, the default value is half the core count, is fine as this should technically be the limit but CpuLayout.CORES.length is more realistic
-                                1, v->Component.literal(Integer.toString(v))))
-                        .setBinding((s, v)->{
+                        .setControl(opt -> new SliderControl(opt,
+                                1,
+                                CpuLayout.getCoreCount(),
+                                1,
+                                v -> Component.literal(Integer.toString(v))))
+                        .setBinding((s, v) -> {
                             s.serviceThreads = v;
                             var instance = VoxyCommon.getInstance();
                             if (instance != null) {
@@ -77,7 +75,7 @@ public abstract class VoxyConfigScreenPages {
                         .setControl(TickBoxControl::new)
                         .setImpact(OptionImpact.VARIES)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setBinding((s,v)->{
+                        .setBinding((s, v) -> {
                             s.dontUseSodiumBuilderThreads = !v;
                             var instance = VoxyCommon.getInstance();
                             if (instance != null) {
@@ -110,43 +108,47 @@ public abstract class VoxyConfigScreenPages {
                                     vrsh.shutdownRenderer();
                                 }
                             }
+                            try { IrisUtil.reload(); } catch (Throwable ignored) {}
                         }, s -> s.enableRendering)
                         .setImpact(OptionImpact.HIGH)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Component.translatable("voxy.config.general.subDivisionSize"))
                         .setTooltip(Component.translatable("voxy.config.general.subDivisionSize.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 0, SUBDIV_IN_MAX, 1, v->Component.literal(Integer.toString(Math.round(ln2subDiv(v))))))
+                        .setControl(opt -> new SliderControl(opt, 0, SUBDIV_IN_MAX, 1, v -> Component.literal(Integer.toString(Math.round(ln2subDiv(v))))))
                         .setBinding((s, v) -> s.subDivisionSize = ln2subDiv(v), s -> subDiv2ln(s.subDivisionSize))
                         .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Component.translatable("voxy.config.general.renderDistance"))
                         .setTooltip(Component.translatable("voxy.config.general.renderDistance.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 2, 64, 1, v->Component.literal(Integer.toString(v * 32))))//Every unit is equal to 32 vanilla chunks
-                        .setBinding((s, v)-> {
-                            s.sectionRenderDistance = v;
-                            var vrsh = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;
+                        // Range: 10 to 64*16 (1024). Display: v*2
+                        .setControl(opt -> new SliderControl(opt, 10, 64 * 16, 1, v -> Component.literal(Integer.toString(v * 2))))
+                        .setBinding((s, v) -> {
+                            // Value stored as float fraction
+                            s.sectionRenderDistance = ((float)v) / 16.0f;
+
+                            var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
                             if (vrsh != null) {
                                 var vrs = vrsh.getVoxyRenderSystem();
                                 if (vrs != null) {
-                                    vrs.setRenderDistance(v);
+                                    vrs.setRenderDistance(s.sectionRenderDistance);
                                 }
                             }
-                        }, s -> s.sectionRenderDistance)
+                        }, s -> Math.round(s.sectionRenderDistance * 16))
                         .setImpact(OptionImpact.LOW)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
-                ).add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Component.translatable("voxy.config.general.vanilla_fog"))
-                        .setTooltip(Component.translatable("voxy.config.general.vanilla_fog.tooltip"))
+                ).build()
+        );
+
+        groups.add(OptionGroup.createBuilder()
+                .add(OptionImpl.createBuilder(boolean.class, storage)
+                        .setName(Component.translatable("voxy.config.general.render_fog"))
+                        .setTooltip(Component.translatable("voxy.config.general.render_fog.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)-> s.renderVanillaFog = v, s -> s.renderVanillaFog)
-                        .build()
-                ).add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Component.translatable("voxy.config.general.render_statistics"))
-                        .setTooltip(Component.translatable("voxy.config.general.render_statistics.tooltip"))
-                        .setControl(TickBoxControl::new)
-                        .setBinding((s, v)-> RenderStatistics.enabled = v, s -> RenderStatistics.enabled)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).build()
