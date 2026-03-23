@@ -39,5 +39,8 @@
     "fabricloader": ">=0.14.22",
     "fabric-api": ">=0.91.1"
   },
+  "suggests": {
+    "java": ">=21"
+  },
   "accessWidener": "voxy.accesswidener"
 }
