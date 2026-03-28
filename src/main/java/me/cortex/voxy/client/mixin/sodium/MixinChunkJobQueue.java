@@ -4,6 +4,7 @@ import me.cortex.voxy.client.compat.SemaphoreBlockImpersonator;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.thread.MultiThreadPrioritySemaphore;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkJob;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -11,9 +12,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Collection;
 import java.util.concurrent.Semaphore;
 
-@Mixin(targets={"me.jellysquid.mods.sodium.client.render.chunk.compile.executor.ChunkJobQueue"},remap = false)
+@Mixin(targets = {"net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkJobQueue"}, remap = false)
 public class MixinChunkJobQueue {
     @Unique private MultiThreadPrioritySemaphore.Block voxy$semaphoreBlock;
 
@@ -28,7 +30,7 @@ public class MixinChunkJobQueue {
     }
 
     @Inject(method = "shutdown", at = @At("RETURN"))
-    private void voxy$injectAtShutdown(CallbackInfoReturnable ci) {
+    private void voxy$injectAtShutdown(CallbackInfoReturnable<Collection<ChunkJob>> cir) {
         if (this.voxy$semaphoreBlock != null) {
             this.voxy$semaphoreBlock.free();
         }

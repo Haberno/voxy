@@ -6,6 +6,7 @@ import me.cortex.voxy.client.core.gl.GlTexture;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.InventoryMenu;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
@@ -32,8 +33,9 @@ public class ModelStore {
 
         //Limit the mips of the texture to match that of the terrain atlas
         int mipLvl = ((TextureAtlas) Minecraft.getInstance().getTextureManager()
-                .getTexture(new ResourceLocation("minecraft", "textures/atlas/blocks.png")))
+                .getTexture(InventoryMenu.BLOCK_ATLAS))
                 .mipLevel;
+
 
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
