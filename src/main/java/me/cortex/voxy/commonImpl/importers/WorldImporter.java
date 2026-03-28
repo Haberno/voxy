@@ -16,6 +16,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.lwjgl.system.MemoryUtil;
@@ -48,7 +49,6 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
@@ -493,11 +493,9 @@ public class WorldImporter implements IDataImporter {
         }
 
         var blockStatesRes = blockStateCodec.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
-        blockStatesRes.get().ifRight(partial -> {
+        var blockStates = blockStatesRes.resultOrPartial(errorMsg -> {
             //TODO: if its only partial, it means should try to upgrade the nbt format with datafixerupper probably
-            return;
-        });
-        var blockStates = blockStatesRes.getOrThrow(false, Logger::error);
+        }).orElseThrow(() -> {return new IllegalStateException("Blockstate data is completely unreadable or missing!");});
         var biomes = this.defaultBiomeProvider;
         var optBiomes = section.getCompound("biomes");
         if (!optBiomes.isEmpty()) {

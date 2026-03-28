@@ -36,7 +36,6 @@ public class ModelStore {
                 .getTexture(InventoryMenu.BLOCK_ATLAS))
                 .mipLevel;
 
-
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_LOD, 0);
