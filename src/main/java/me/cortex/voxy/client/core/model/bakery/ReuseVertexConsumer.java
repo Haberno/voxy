@@ -27,52 +27,47 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
-    public ReuseVertexConsumer vertex(double x, double y, double z) {
+    public ReuseVertexConsumer addVertex(float x, float y, float z) {
         this.ensureCanPut();
-        this.ptr += VERTEX_FORMAT_SIZE; this.count++; //Goto next vertex
+        this.ptr += VERTEX_FORMAT_SIZE; this.count++;
         this.meta(this.defaultMeta);
-        MemoryUtil.memPutFloat(this.ptr, (float) x);
-        MemoryUtil.memPutFloat(this.ptr + 4, (float) y);
-        MemoryUtil.memPutFloat(this.ptr + 8, (float) z);
+        MemoryUtil.memPutFloat(this.ptr, x);
+        MemoryUtil.memPutFloat(this.ptr + 4, y);
+        MemoryUtil.memPutFloat(this.ptr + 8, z);
         return this;
     }
-
+    
     public ReuseVertexConsumer meta(int metadata) {
         MemoryUtil.memPutInt(this.ptr + 12, metadata);
         return this;
     }
-
+    
     @Override
-    public ReuseVertexConsumer color(int red, int green, int blue, int alpha) {
+    public ReuseVertexConsumer setColor(int red, int green, int blue, int alpha) {
         return this;
     }
 
     @Override
-    public VertexConsumer color(int i) {
+    public VertexConsumer setColor(int i) {
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer uv(float u, float v) {
+    public ReuseVertexConsumer setUv(float u, float v) {
         MemoryUtil.memPutFloat(this.ptr + 16, u);
         MemoryUtil.memPutFloat(this.ptr + 20, v);
         return this;
     }
 
+    
     @Override
-    public ReuseVertexConsumer overlayCoords(int u, int v) {
-        return this;
-    }
+    public ReuseVertexConsumer setUv1(int u, int v) { return this; }
 
     @Override
-    public ReuseVertexConsumer uv2(int u, int v) {
-        return this;
-    }
+    public ReuseVertexConsumer setUv2(int u, int v) { return this; }
 
     @Override
-    public ReuseVertexConsumer normal(float x, float y, float z) {
-        return this;
-    }
+    public ReuseVertexConsumer setNormal(float x, float y, float z) { return this; }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
         this.anyShaded |= quad.isShade();
@@ -84,10 +79,10 @@ public final class ReuseVertexConsumer implements VertexConsumer {
             float x = Float.intBitsToFloat(data[offset]);
             float y = Float.intBitsToFloat(data[offset + 1]);
             float z = Float.intBitsToFloat(data[offset + 2]);
-            this.vertex(x, y, z);
+            this.addVertex(x, y, z);
             float u = Float.intBitsToFloat(data[offset + 4]);
             float v = Float.intBitsToFloat(data[offset + 5]);
-            this.uv(u, v);
+            this.setUv(u, v);
 
             this.meta(metadata);
         }
@@ -98,9 +93,9 @@ public final class ReuseVertexConsumer implements VertexConsumer {
         if ((long) (this.count + 5) * VERTEX_FORMAT_SIZE < this.buffer.size) {
             return;
         }
-        long offset = this.ptr-this.buffer.address;
-        //1.5x the size
-        var newBuffer = new MemoryBuffer((((int)(this.buffer.size*2)+VERTEX_FORMAT_SIZE-1)/VERTEX_FORMAT_SIZE)*VERTEX_FORMAT_SIZE);
+        long offset = this.ptr - this.buffer.address;
+        // 2x growth strategy
+        var newBuffer = new MemoryBuffer((((int)(this.buffer.size * 2) + VERTEX_FORMAT_SIZE - 1) / VERTEX_FORMAT_SIZE) * VERTEX_FORMAT_SIZE);
         this.buffer.cpyTo(newBuffer.address);
         this.buffer.free();
         this.buffer = newBuffer;
@@ -110,17 +105,19 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     public ReuseVertexConsumer reset() {
         this.anyShaded = false;
         this.anyDarkendTex = false;
-        this.defaultMeta = 0;//RESET THE DEFAULT META
+        this.defaultMeta = 0;
         this.count = 0;
-        this.ptr = this.buffer.address - VERTEX_FORMAT_SIZE;//the thing is first time this gets incremented by FORMAT_STRIDE
+        this.ptr = this.buffer.address - VERTEX_FORMAT_SIZE;
         return this;
     }
 
     public void free() {
+        if (this.buffer != null) {
+            this.buffer.free();
+            this.buffer = null;
+        }
         this.ptr = 0;
         this.count = 0;
-        this.buffer.free();
-        this.buffer = null;
     }
 
     public boolean isEmpty() {
@@ -128,26 +125,11 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public int quadCount() {
-        if (this.count%4 != 0) throw new IllegalStateException();
-        return this.count/4;
+        if (this.count % 4 != 0) throw new IllegalStateException("Vertex count is not a multiple of 4!");
+        return this.count / 4;
     }
 
     public long getAddress() {
         return this.buffer.address;
-    }
-
-    @Override
-    public void defaultColor(int red, int green, int blue, int alpha) {
-        return;
-    }
-
-    @Override
-    public void endVertex() {
-        return;
-    }
-
-    @Override
-    public void unsetDefaultColor() {
-        return;
     }
 }

@@ -6,12 +6,13 @@ import com.mojang.datafixers.util.Either;
 
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import net.minecraft.server.level.ChunkHolder;
-import net.minecraft.server.level.ChunkHolder.ChunkLoadingFailure;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ChunkResult;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import org.popcraft.chunky.mixin.ServerChunkCacheMixin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.popcraft.chunky.platform.FabricWorld;
@@ -21,28 +22,20 @@ import java.util.concurrent.CompletableFuture;
 @Mixin(FabricWorld.class)
 public class MixinFabricWorld {
 
-    @WrapOperation(
-        method = "getChunkAtAsync",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/server/level/ChunkHolder;getOrScheduleFuture(Lnet/minecraft/world/level/chunk/ChunkStatus;Lnet/minecraft/server/level/ChunkMap;)Ljava/util/concurrent/CompletableFuture;"
-        )
-    )
-    private CompletableFuture<?> wrapGetOrScheduleFuture(
-        ChunkHolder holder,
-        ChunkStatus status,
-        ChunkMap storage,
-        Operation<CompletableFuture<Either<ChunkAccess, ChunkLoadingFailure>>> original
-    ) {
-        CompletableFuture<Either<ChunkAccess, ChunkLoadingFailure>> future = original.call(holder, status, storage);
-
-        return future.thenApply(res -> {
-            res.ifLeft(chunk -> {
-                if (chunk instanceof LevelChunk worldChunk) {
-                    VoxelIngestService.tryAutoIngestChunk(worldChunk);
-                }
+    @WrapOperation(method = "getChunkAtAsync", at = @At(value = "INVOKE", target = "Lorg/popcraft/chunky/mixin/ServerChunkCacheMixin;invokeGetChunkFutureMainThread(IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Ljava/util/concurrent/CompletableFuture;"))
+    private CompletableFuture<ChunkResult<ChunkAccess>> captureGeneratedChunk(ServerChunkCacheMixin instance, int i, int j, ChunkStatus chunkStatus, boolean b, Operation<CompletableFuture<ChunkResult<ChunkAccess>>> original) {
+        var future = original.call(instance, i, j, chunkStatus, b);
+        if (false) {//TODO: ADD SERVER CONFIG THING
+            return future;
+        } else {
+            return future.thenApply(res -> {
+                res.ifSuccess(chunk -> {
+                    if (chunk instanceof LevelChunk worldChunk) {
+                        VoxelIngestService.tryAutoIngestChunk(worldChunk);
+                    }
+                });
+                return res;
             });
-            return res;
-        });
+        }
     }
 }

@@ -38,5 +38,10 @@
   },
   "overwrites": {
     "requireAnnotations": true
-  }
+  },
+  "mixins": [
+    "sodium.MixinDefaultChunkRenderer",
+    "sodium.MixinSodiumWorldRenderer",
+//    "sodium.MixinSodiumWorldRendererLegacy"
+  ]
 }
