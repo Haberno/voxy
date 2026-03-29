@@ -16,6 +16,7 @@
     "iris.MixinShaderPackSourceNames",
     "iris.MixinStandardMacros",
     "minecraft.MixinClientChunkCache",
+    "minecraft.MixinClientCommonNetworkHandler",
     "minecraft.MixinClientLevel",
     "minecraft.MixinClientPacketListener",
     "minecraft.MixinDebugScreenOverlay",
@@ -40,8 +41,8 @@
     "requireAnnotations": true
   },
   "mixins": [
+    "minecraft.MixinBlockableEventLoop",
     "sodium.MixinDefaultChunkRenderer",
-    "sodium.MixinSodiumWorldRenderer",
-//    "sodium.MixinSodiumWorldRendererLegacy"
+    "sodium.MixinSodiumWorldRenderer"
   ]
 }
